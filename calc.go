@@ -18,8 +18,8 @@ func (s *Stack[T]) Push(value T) {
 func (s *Stack[T]) Pop() (T, error) {
 	stackLength := len(s.values)
 	if stackLength == 0 {
-		var null T
-		return null, errors.New("Can't pop from an empty Stack")
+		var zero T
+		return zero, errors.New("Can't pop from an empty Stack")
 	}
 
 	res := s.values[stackLength-1]
@@ -31,8 +31,8 @@ func (s *Stack[T]) Pop() (T, error) {
 func (s *Stack[T]) Peek() (T, error) {
 	stackLength := len(s.values)
 	if stackLength == 0 {
-		var null T
-		return null, errors.New("Can't peek on an empty Stack")
+		var zero T
+		return zero, errors.New("Can't peek on an empty Stack")
 	}
 
 	return s.values[stackLength-1], nil
@@ -62,21 +62,24 @@ func main() {
 	}
 }
 
-func evaluate(equation string) (float64, error) {
+func evaluate(expression string) (float64, error) {
 	values := Stack[float64]{}
 	operators := Stack[rune]{}
 
-	for i := 0; i < len(equation); i++ {
-		character := rune(equation[i])
+	for i := 0; i < len(expression); i++ {
+		character := rune(expression[i])
 
 		switch {
+		case character == ' ':
+			continue
+
 		case isDigit(character):
 			start := i
-			for i < len(equation) && (isDigit(rune(equation[i])) || rune(equation[i]) == '.') {
+			for i < len(expression) && (isDigit(rune(expression[i])) || rune(expression[i]) == '.') {
 				i++
 			}
 
-			numberString := equation[start:i]
+			numberString := expression[start:i]
 			val, err := strconv.ParseFloat(numberString, 64)
 
 			if err != nil {
@@ -91,15 +94,22 @@ func evaluate(equation string) (float64, error) {
 
 		case character == ')':
 			operator, err := operators.Peek()
+
+			if err == nil && expression[i-1] == '(' {
+				return 0, errors.New("Empty parentheses")
+			}
+
 			for operator != '(' && err == nil {
-				err := executeTopOperator(&values, &operators)
+				err = executeTopOperator(&values, &operators)
 				if err != nil {
 					return 0, err
 				}
+
+				operator, err = operators.Peek()
 			}
 
 			if err != nil {
-				return 0, err
+				return 0, errors.New("Mismatched parentheses: unexpected ')'")
 			} else {
 				operators.Pop()
 			}
@@ -107,17 +117,18 @@ func evaluate(equation string) (float64, error) {
 		case isOperator(character):
 			operator, err := operators.Peek()
 			for priority(operator) >= priority(character) && err == nil {
-				err := executeTopOperator(&values, &operators)
+				err = executeTopOperator(&values, &operators)
 				if err != nil {
 					return 0, err
 				}
-			}
 
-			if err != nil {
-				return 0, err
+				operator, err = operators.Peek()
 			}
 
 			operators.Push(character)
+
+		default:
+			return 0, fmt.Errorf("Unexpected character '%c'", character)
 		}
 	}
 
@@ -166,6 +177,10 @@ func executeTopOperator(values *Stack[float64], operators *Stack[rune]) error {
 		return errors.New("No operators to execute")
 	}
 	operator, _ := operators.Pop()
+
+	if operator == '(' {
+		return errors.New("Mismatched parentheses: unclosed '('")
+	}
 
 	if values.Len() < 2 {
 		return fmt.Errorf("Not enough values to use with '%c'", operator)
