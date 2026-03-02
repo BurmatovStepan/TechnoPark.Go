@@ -122,21 +122,19 @@ func uniq(lines []string, options UniqOptions) ([]string, error) {
 		currentLine = formatString(lines[i], options)
 
 		if currentUniqueLine != currentLine {
-			appendResult(&result, lines[currentUniqueLineIndex], lineCount, options)
-
-			lineCount = 1
-			currentUniqueLineIndex = i
-			currentUniqueLine = currentLine
-		} else {
-			lineCount++
+			result = appendResult(result, lines[currentUniqueLineIndex], lineCount, options)
+			lineCount, currentUniqueLineIndex, currentUniqueLine = 0, i, currentLine
 		}
+
+		lineCount++
 	}
-	appendResult(&result, lines[currentUniqueLineIndex], lineCount, options)
+	result = appendResult(result, lines[currentUniqueLineIndex], lineCount, options)
 
 	return result, nil
 }
 
 func formatString(line string, options UniqOptions) string {
+	const fieldSeparator = ' '
 	result := line
 
 	if options.IgnoreFields > 0 {
@@ -145,7 +143,7 @@ func formatString(line string, options UniqOptions) string {
 		inField := false
 
 		for i, character := range result {
-			if character != ' ' && inField == false {
+			if character != fieldSeparator && !inField {
 				fieldsCount++
 				inField = true
 
@@ -154,7 +152,7 @@ func formatString(line string, options UniqOptions) string {
 					break
 				}
 
-			} else if character == ' ' {
+			} else if character == fieldSeparator {
 				inField = false
 			}
 
@@ -166,11 +164,10 @@ func formatString(line string, options UniqOptions) string {
 
 	if options.IgnoreCharacters > 0 {
 		runes := []rune(result)
+		result = ""
 
 		if options.IgnoreCharacters < len(runes) {
 			result = string(runes[options.IgnoreCharacters:])
-		} else {
-			result = ""
 		}
 	}
 
@@ -181,7 +178,7 @@ func formatString(line string, options UniqOptions) string {
 	return result
 }
 
-func appendResult(result *[]string, line string, lineCount int, options UniqOptions) {
+func appendResult(result []string, line string, lineCount int, options UniqOptions) []string {
 	lineToAdd := line
 	addLine := false
 
@@ -207,6 +204,8 @@ func appendResult(result *[]string, line string, lineCount int, options UniqOpti
 	}
 
 	if addLine {
-		*result = append(*result, lineToAdd)
+		result = append(result, lineToAdd)
 	}
+
+	return result
 }
