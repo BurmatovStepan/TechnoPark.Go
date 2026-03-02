@@ -7,6 +7,9 @@ import (
 	"strconv"
 )
 
+const groupOpen = '('
+const groupClose = ')'
+
 type Stack[T any] struct {
 	values []T
 }
@@ -57,12 +60,16 @@ func main() {
 
 	if err != nil {
 		fmt.Println(err.Error())
-	} else {
-		fmt.Println(result)
+		return
 	}
+
+	fmt.Println(result)
 }
 
 func evaluate(expression string) (float64, error) {
+	const ignoreCharacter = ' '
+	const decimalSeparator = '.'
+
 	values := Stack[float64]{}
 	operators := Stack[rune]{}
 
@@ -70,12 +77,12 @@ func evaluate(expression string) (float64, error) {
 		character := rune(expression[i])
 
 		switch {
-		case character == ' ':
+		case character == ignoreCharacter:
 			continue
 
 		case isDigit(character):
 			start := i
-			for i < len(expression) && (isDigit(rune(expression[i])) || rune(expression[i]) == '.') {
+			for i < len(expression) && (isDigit(rune(expression[i])) || rune(expression[i]) == decimalSeparator) {
 				i++
 			}
 
@@ -85,21 +92,26 @@ func evaluate(expression string) (float64, error) {
 			if err != nil {
 				return 0, err
 			}
+
 			values.Push(val)
 
 			i--
 
-		case character == '(':
+		case character == groupOpen:
 			operators.Push(character)
 
-		case character == ')':
+		case character == groupClose:
 			operator, err := operators.Peek()
 
-			if err == nil && expression[i-1] == '(' {
+			if err != nil {
+				return 0, fmt.Errorf("Mismatched parentheses: unexpected '%c'", groupClose)
+			}
+
+			if expression[i-1] == groupOpen {
 				return 0, errors.New("Empty parentheses")
 			}
 
-			for operator != '(' && err == nil {
+			for operator != groupOpen {
 				err = executeTopOperator(&values, &operators)
 				if err != nil {
 					return 0, err
@@ -108,15 +120,12 @@ func evaluate(expression string) (float64, error) {
 				operator, err = operators.Peek()
 			}
 
-			if err != nil {
-				return 0, errors.New("Mismatched parentheses: unexpected ')'")
-			} else {
-				operators.Pop()
-			}
+			operators.Pop()
 
 		case isOperator(character):
 			operator, err := operators.Peek()
-			for priority(operator) >= priority(character) && err == nil {
+
+			for operators.Len() > 0 && priority(operator) >= priority(character) {
 				err = executeTopOperator(&values, &operators)
 				if err != nil {
 					return 0, err
@@ -160,6 +169,10 @@ func isOperator(character rune) bool {
 	return character == '+' || character == '-' || character == '*' || character == '/'
 }
 
+func ParseFloat64(initialString string) (float64, error) {
+	return strconv.ParseFloat(initialString, 64)
+}
+
 func priority(operator rune) int {
 	switch operator {
 	case '+', '-':
@@ -178,8 +191,8 @@ func executeTopOperator(values *Stack[float64], operators *Stack[rune]) error {
 	}
 	operator, _ := operators.Pop()
 
-	if operator == '(' {
-		return errors.New("Mismatched parentheses: unclosed '('")
+	if operator == groupOpen {
+		return fmt.Errorf("Mismatched parentheses: unclosed '%c'", groupOpen)
 	}
 
 	if values.Len() < 2 {
