@@ -34,7 +34,10 @@ func SelectUsers(in, out chan interface{}) {
 	mu := sync.Mutex{}
 
 	for data := range in {
-		email := data.(string)
+		email, ok := data.(string)
+		if !ok {
+			continue
+		}
 
 		wg.Go(func() {
 			user := GetUser(email)
@@ -43,9 +46,9 @@ func SelectUsers(in, out chan interface{}) {
 			if _, exists := uniqueUsers[user]; !exists {
 				out <- user
 				uniqueUsers[user] = struct{}{}
-
-				mu.Unlock()
 			}
+
+			mu.Unlock()
 		})
 	}
 
@@ -57,7 +60,11 @@ func SelectMessages(in, out chan interface{}) {
 	wg := sync.WaitGroup{}
 
 	for data := range in {
-		user := data.(User)
+		user, ok := data.(User)
+		if !ok {
+			continue
+		}
+
 		usersBatch = append(usersBatch, user)
 
 		if len(usersBatch) == GetMessagesMaxUsersBatch {
@@ -93,11 +100,14 @@ func CheckSpam(in, out chan interface{}) {
 	wg := sync.WaitGroup{}
 
 	for data := range in {
-		messageId := data.(MsgID)
+		messageId, ok := data.(MsgID)
+		if !ok {
+			continue
+		}
 
 		wg.Go(func() {
 			hasSpamQueue <- struct{}{}
-			defer func(){ <-hasSpamQueue }()
+			defer func() { <-hasSpamQueue }()
 
 			isSpam, _ := HasSpam(messageId)
 			out <- MsgData{messageId, isSpam}
@@ -111,7 +121,11 @@ func CombineResults(in, out chan interface{}) {
 	var messages []MsgData
 
 	for data := range in {
-		message := data.(MsgData)
+		message, ok := data.(MsgData)
+		if !ok {
+			continue
+		}
+
 		messages = append(messages, message)
 	}
 
